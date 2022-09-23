@@ -1,4 +1,6 @@
 #pragma once
+#ifndef _VEC_
+#define _VEC_
 #include <iostream>
 
 
@@ -71,6 +73,6 @@ inline Vec3 operator*(const float f, const Vec3 v)
 	return Vec3{ f * v.x, f * v.y, f * v.z };
 }
 
-
+#endif;
 
 
