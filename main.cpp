@@ -353,4 +353,4 @@ int main()
 	imshow("Display Window", image);
 	waitKey(0);
 	return 0;
-}
+};
