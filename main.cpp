@@ -122,7 +122,7 @@ int main()
 
 	//imwrite("MyImage.png", image);
 
-	Camera cam{ {0, -100, -500} };
+	Camera cam{ {0, -100, -10} };
 	//Camera cam{ {0, -100, -700000}};
 	//Sphere sol{ {0, 500, 0}, 500, {1, 1, 1} };
 	//Sphere murFond{ {0, 0, 800}, 500, {1, 1, 1} };
@@ -137,7 +137,7 @@ int main()
 	s.push_back({ {-920, -60, 0}, 700, {1, 1, 1} });	 // mur gauche
 	s.push_back({ {920, -60, 0}, 700, {1, 1, 1} });		 // mur droit
 	s.push_back({ {-75, -60, 0}, 70, {1, 0, 0} });		 // sphere rouge
-	s.push_back({ {75, -60, 0}, 70, {0, 0, 1} });		 // sphere bleue
+	s.push_back({ {75, -60, -25}, 70, {0, 0, 1} });		 // sphere bleue
 
 	//s[0] = { {0, 0, 800}, 500, {1, 1, 1} };      // fond
 	//s[1] = { {0, 500, 100}, 500, {1, 1, 1} };      // sol
@@ -158,11 +158,11 @@ int main()
 		for (int j = 0; j < sizeY; j++)
 		{
 			// Cam ortho
-			Ray r{ cam.position + Vec3{ (float)(i - sizeX / 2), (float)(j - sizeY / 2), 0 }, {0, 0, 1} };
+			//Ray r{ cam.position + Vec3{ (float)(i - sizeX / 2), (float)(j - sizeY / 2), 0 }, {0, 0, 1} };
 
 			// Cam perspective
 			Vec3 posPixel = cam.position + Vec3{ (float)(i - sizeX / 2), (float)(j - sizeY / 2), 0 };
-			//Ray r{ posPixel, (cam.position + Vec3{0, 0, -150} - posPixel).unitVector() };
+			Ray r{ posPixel, (posPixel - cam.position + Vec3{0, 0, -1}).unitVector() };
 
 
 			float inter = 9999999;

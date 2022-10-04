@@ -10,6 +10,7 @@
 #include <vector>
 #include <map>
 #include <chrono>
+#include <string>
 
 using namespace cv;
 using namespace std;
@@ -53,7 +54,7 @@ int clampColor(float x, float coef) {
 		return (int)(255 * (x / coef));
 }
 
-int estOcculte(Light l, Vec3 point, vector<Sphere> objetsScene, float eps) {
+int estOcculte(Light l, Vec3 point, vector<Sphere> &objetsScene, float eps) {
 	Vec3 pointLum = l.position - point;
 	Vec3 dirVersLum = pointLum.unitVector();
 	float distancePointLum = pointLum.normSquared();
@@ -77,7 +78,7 @@ struct Boite {
 	vector<Sphere> spheres;
 	//string name;
 
-	bool intersect(const Ray& r)
+	bool intersect(const Ray& r) const
 	{
 		float tmin = (min.x - r.origin.x) / r.direction.x;
 		float tmax = (max.x - r.origin.x) / r.direction.x;
@@ -118,73 +119,21 @@ struct Boite {
 	bool operator==(const Boite& other) const
 	{
 		return (min.x == other.min.x && min.y == other.min.y && min.z == other.min.z &&
-			 max.x == other.max.x && max.y == other.max.y && max.z == other.max.z);
+			max.x == other.max.x && max.y == other.max.y && max.z == other.max.z);
 	}
 };
 
 struct ArbreBinBoite {
 
 	Boite current;
-	ArbreBinBoite *left;
-	ArbreBinBoite *right;
-
-	void creerEnfants() {
-		float dimX = current.max.x - current.min.x;
-		float dimY = current.max.y - current.min.y;
-		float dimZ = current.max.z - current.min.z;
-
-		if (dimX > dimY && dimX > dimZ) 
-		{
-			// on coupe sur X
-			float limite = current.min.x + dimX / 2.0f;
-			left = new ArbreBinBoite{ Boite{ {current.min.x, current.min.y, current.min.z}, {limite, current.max.y, current.max.z} } };
-			right = new ArbreBinBoite{ Boite{ {limite, current.min.y, current.min.z}, {current.max.x, current.max.y, current.max.z} } };
-
-			for (int i = 0; i < current.spheres.size(); i++) {
-				if (current.spheres[i].centre.x < limite)
-					left->current.spheres.push_back(current.spheres[i]);
-				else
-					right->current.spheres.push_back(current.spheres[i]);
-			}
-		}
-		else if (dimY > dimX && dimY > dimZ)
-		{
-			// on coupe sur Y
-			float limite = current.min.y + dimY / 2.0f;
-			left = new ArbreBinBoite{ Boite{ {current.min.x, current.min.y, current.min.z}, {current.max.x, limite, current.max.z} } };
-			right =new ArbreBinBoite{ Boite{ {current.min.x, limite, current.min.z}, {current.max.x, current.max.y, current.max.z} } };
-
-			for (int i = 0; i < current.spheres.size(); i++) {
-				if (current.spheres[i].centre.y < limite)
-					left->current.spheres.push_back(current.spheres[i]);
-				else
-					right->current.spheres.push_back(current.spheres[i]);
-			}
-		}
-		else
-		{
-			// on coupe sur Z
-			float limite = current.min.z + dimZ / 2.0f;
-			left = new ArbreBinBoite{ Boite{ {current.min.x, current.min.y, current.min.z}, {current.max.x, current.max.y, limite} } };
-			right = new ArbreBinBoite{ Boite{ {current.min.x, current.min.y, limite}, {current.max.x, current.max.y, current.max.z} } };
-
-			for (int i = 0; i < current.spheres.size(); i++) {
-				if (current.spheres[i].centre.z < limite)
-					left->current.spheres.push_back(current.spheres[i]);
-				else
-					right->current.spheres.push_back(current.spheres[i]);
-			}
-		}
-
-	}
+	ArbreBinBoite* left;
+	ArbreBinBoite* right;
 
 };
 
-void creerEnfants(ArbreBinBoite* pere, int n) 
+void creerEnfants(ArbreBinBoite* pere, int n)
 {
-	cout << "pere : " << pere->current.spheres.size() << endl;
-
-	if(n == 0)
+	if (n == 0)
 		return;
 
 	float dimX = pere->current.max.x - pere->current.min.x;
@@ -201,7 +150,7 @@ void creerEnfants(ArbreBinBoite* pere, int n)
 	vector<Sphere> sleft;
 	vector<Sphere> sright;
 
-	if (dimX > dimY && dimX > dimZ) 
+	if (dimX > dimY && dimX > dimZ)
 	{
 		// on coupe sur X
 		float limite = pere->current.min.x + dimX / 2.0f;
@@ -244,7 +193,7 @@ void creerEnfants(ArbreBinBoite* pere, int n)
 		}
 	}
 
-	if (sleft.size() > 0) 
+	if (sleft.size() > 0)
 	{
 		childLeft->current.spheres = sleft;
 		Boite box;
@@ -305,16 +254,16 @@ void creerEnfants(ArbreBinBoite* pere, int n)
 	}
 	else
 		pere->right = NULL;
-	
+
 }
 
-vector<Sphere> getSphereInBox(ArbreBinBoite* arbre, Ray r) 
+vector<Sphere> getSphereInBox(const ArbreBinBoite* arbre, Ray r)
 {
 	vector<Sphere> res;
 
 	if (!arbre->current.intersect(r)) {
 		return res;
-	}	
+	}
 
 	vector<Sphere> spheresGauche;
 	vector<Sphere> spheresDroit;
@@ -331,7 +280,7 @@ vector<Sphere> getSphereInBox(ArbreBinBoite* arbre, Ray r)
 		for (int i = 0; i < spheresGauche.size(); i++)
 			res.push_back(spheresGauche[i]);
 	}
-	
+
 	if (arbre->right != NULL) {
 		spheresDroit = getSphereInBox(arbre->right, r);
 		for (int i = 0; i < spheresDroit.size(); i++)
@@ -339,20 +288,9 @@ vector<Sphere> getSphereInBox(ArbreBinBoite* arbre, Ray r)
 	}
 
 	return res;
-	
-	//if (spheresGauche.size() == 0) 
-	//	return spheresDroit;
-	//
-	//if (spheresDroit.size() == 0)
-	//	return spheresGauche;
-	//
-	//cout << spheresDroit.size() << endl;
-	//res.reserve(spheresGauche.size() + spheresDroit.size()); // preallocate memory
-	//res.insert(res.end(), spheresGauche.begin(), spheresGauche.end());
-	//res.insert(res.end(), spheresDroit.begin(), spheresDroit.end());
 }
 
-int estOcculte(Light l, Vec3 point, ArbreBinBoite* arbre, float eps) {
+int estOcculte(Light l, Vec3 point, const ArbreBinBoite* arbre, float eps) {
 	Vec3 pointLum = l.position - point;
 	Vec3 dirVersLum = pointLum.unitVector();
 	float distancePointLum = pointLum.normSquared();
@@ -372,8 +310,89 @@ int estOcculte(Light l, Vec3 point, ArbreBinBoite* arbre, float eps) {
 	return 1;
 }
 
-int main()
-{
+std::optional<Vec3> getColorFromRay(Ray ray, const ArbreBinBoite* scene, vector<Light> lights, int profondeur) {
+
+	if (profondeur < 0)
+		return std::nullopt;
+
+	vector<Sphere> sib = getSphereInBox(scene, ray);
+	if (sib.size() > 0) {
+
+		float inter = 9999999;
+		bool intersect = false;
+		int ks = 0;
+
+		for (int k = 0; k < sib.size(); k++) {
+			optional<float> interK = sib[k].intersect(ray);
+
+			if (interK.has_value() && interK.value() < inter) {
+				inter = interK.value();
+				ks = k;
+				intersect = true;
+			}
+		}
+
+		if (intersect)
+		{
+			if (sib[ks].tag == "reflect")
+			{
+				Vec3 point = ray.origin + inter * ray.direction;
+				Vec3 D = ray.direction.norm();
+				Vec3 N = (point - sib[ks].centre).norm();
+				Vec3 R = D - (2 * (N.dot(D)) * N);
+				Ray newRay{ point + R * 0.0006f, R};
+				Vec3 lum{ 0, 0, 0 };
+
+				std::optional<Vec3> refColor = getColorFromRay(newRay, scene, lights, profondeur - 1);
+				if (refColor.has_value())
+					lum = lum + refColor.value();
+
+				return lum;
+			}
+			else if (sib[ks].tag == "refract") {
+
+				// TODO : ajout du calcul du reflet et faire la somme des deux couleurs lum = 0.5 * refract + 0.5 * reflect
+				// ou tirer un random et selon le résultat tirer soit un refract, soit un reflect
+				float eta = 1.5f;
+				Vec3 point = ray.origin + inter * ray.direction;
+				Vec3 D = ray.direction.norm();
+				Vec3 N = (point - sib[ks].centre).norm();
+				float k = 1.0f - eta * eta * (1.0f - N.dot(D) * N.dot(D));
+				if(k < 0){
+					return std::nullopt;
+				}
+				else {
+					Vec3 R = eta * D - eta * (N.dot(D) + sqrt(k)) * N;
+					Ray newRay{ point + R * 0.0006f, R };
+					Vec3 lum{ 0, 0, 0 };
+
+					std::optional<Vec3> refColor = getColorFromRay(newRay, scene, lights, profondeur - 1);
+					if (refColor.has_value())
+						lum = lum + refColor.value();
+
+					return lum;
+				}
+			}
+			else
+			{
+				Vec3 point = ray.origin + inter * ray.direction;
+				Vec3 lum{ 0, 0, 0 };
+				for (int a = 0; a < lights.size(); a++)
+				{
+					Vec3 lu = lights[a].getLightOut(point, ray.origin, sib[ks].centre, sib[ks].color);
+					lum = lum + lu * estOcculte(lights[a], point, scene, 0.0006f);
+				}
+				return lum;
+			}
+		}
+		else 
+			return std::nullopt;
+	}
+	else
+		return std::nullopt;
+}
+
+int main(){
 #pragma region definition Couleurs
 	Vec3b red;
 	red[0] = 0;
@@ -402,45 +421,48 @@ int main()
 	Mat image = Mat::zeros(sizeX, sizeY, CV_8UC3);
 
 	//Camera cam{ {sizeX / 2, sizeY / 2, -500} };
-	Camera cam{ {50, -50, -500} };
+	Camera cam{ {0, -100, -500} };
 	vector<Sphere> s;
 	float rayon = 25;
 
 	// generation des spheres
-	//for(int i = 0; i < 3; i++)
-	//	for(int j = 0; j < 5; j++)
-	//		for (int k = 0; k < 1; k++) 
+	//for (int i = 0; i < 3; i++)
+	//	for (int j = 0; j < 5; j++)
+	//		for (int k = 0; k < 1; k++)
 	//			s.push_back({ {i * 2 * rayon + 1, j * 2 * rayon + 1, k * 2 * rayon + 1}, rayon, {1, 0, 0} });
+	s.push_back({ {0, 0, 550}, 500, {1, 1, 1}, "" });		 // fond
+	s.push_back({ {0, 500, 100}, 500, {1, 1, 1}, "" });		 // sol
+	s.push_back({ {-920, -60, 0}, 700, {1, 1, 1}, "" });	 // mur gauche
+	s.push_back({ {920, -60, 0}, 700, {1, 1, 1}, "" });		 // mur droit
 
-	s.push_back({ {0, 0, 550}, 500, {1, 1, 1} });		 // fond
-	s.push_back({ {0, 500, 100}, 500, {1, 1, 1} });		 // sol
-	s.push_back({ {-920, -60, 0}, 700, {1, 1, 1} });	 // mur gauche
-	s.push_back({ {920, -60, 0}, 700, {1, 1, 1} });		 // mur droit
-	s.push_back({ {-75, -60, 0}, 70, {1, 0, 0} });		 // sphere rouge
-	s.push_back({ {75, -60, 0}, 70, {0, 0, 1} });		 // sphere bleue
+	//s.push_back({ {-75, -60, 0}, 70, {1, 0, 0}, false });		 // sphere rouge
+	//s.push_back({ {90, -300, 0}, 70, {0, 0, 1}, false });		 // sphere bleue
+	//s.push_back({ {75, -60, 0}, 70, {1, 1, 1}, true });		 // sphere mirroir
+	s.push_back({ {-75, -60, 0}, 70, {1, 0, 0}, "reflect" });
+	s.push_back({ {75, -60, 0}, 70, {1, 0, 0}, "refract" });
+	s.push_back({ {0, -200, 0}, 70, {0, 1, 0}, "" });
 
-	//Boite box{ {minX, minY, minZ}, {maxX, maxY, maxZ} };
-	Boite box{ {0,0,0}, {0,0,0}};
+	Boite box{ {0,0,0}, {0,0,0} };
 	std::unordered_map<string, vector<Sphere>> m;
 
 	float minX = 999999, minY = 999999, minZ = 999999;
 	float maxX = -999999, maxY = -999999, maxZ = -999999;
-	for (int i = 0; i < s.size(); i++) 
+	for (int i = 0; i < s.size(); i++)
 	{
-		if (s[i].centre.x - rayon < minX)
-			minX = s[i].centre.x - rayon;
-		if (s[i].centre.x + rayon > maxX)
-			maxX = s[i].centre.x + rayon;
+		if (s[i].centre.x - s[i].radius < minX)
+			minX = s[i].centre.x - s[i].radius;
+		if (s[i].centre.x + s[i].radius > maxX)
+			maxX = s[i].centre.x + s[i].radius;
 
-		if (s[i].centre.y - rayon < minY)
-			minY = s[i].centre.y - rayon;
-		if (s[i].centre.y + rayon > maxY)
-			maxY = s[i].centre.y + rayon;
+		if (s[i].centre.y - s[i].radius < minY)
+			minY = s[i].centre.y - s[i].radius;
+		if (s[i].centre.y + s[i].radius > maxY)
+			maxY = s[i].centre.y + s[i].radius;
 
-		if (s[i].centre.z - rayon < minZ)
-			minZ = s[i].centre.z - rayon;
-		if (s[i].centre.z + rayon > maxZ)
-			maxZ = s[i].centre.z + rayon;
+		if (s[i].centre.z - s[i].radius < minZ)
+			minZ = s[i].centre.z - s[i].radius;
+		if (s[i].centre.z + s[i].radius > maxZ)
+			maxZ = s[i].centre.z + s[i].radius;
 
 		box.spheres.push_back(s[i]);
 	}
@@ -448,38 +470,57 @@ int main()
 	box.min = { minX, minY, minZ };
 	box.max = { maxX, maxY, maxZ };
 
-	int profondeurArbre = 3;
+	int profondeurArbre = 1;
 	ArbreBinBoite* racine = new ArbreBinBoite{ box };
-	creerEnfants(racine, 3);
-	//cout << minX << endl;
-	//cout << racine->left->left->left->current.spheres.size() << endl;;
-
-	//cout << minX << " " << maxX << endl;
-	//cout << minY << " " << maxY << endl;
-	//cout << minZ << " " << maxZ << endl;
+	creerEnfants(racine, profondeurArbre);
 
 
 	vector<Light> l;
-	l.push_back({ {300, -100, -50}, 1200, { 0.5f, 0, 1} });
+	//l.push_back({ {0, -600, 0}, 1200, { 0.5f, 0, 1} });
+	l.push_back({ {0, -200, -300}, 1200, { 1, 1, 1} });
+	//l.push_back({ {300, 0, -300}, 1200, { 0.5f, 0, 1} });
 
 	for (int i = 0; i < sizeX; i++)
 		for (int j = 0; j < sizeY; j++)
 		{
-			image.at<Vec3b>(j, i) = background;
+			//image.at<Vec3b>(j, i) = background;
 
 			// Cam ortho
 			Ray r{ cam.position + Vec3{ (float)(i - sizeX / 2), (float)(j - sizeY / 2), 0 }, {0, 0, 1} };
 
+			//Vec3 posPixel = cam.position + Vec3{ (float)(i - sizeX / 2), (float)(j - sizeY / 2), 0 };
+			//Ray r{ posPixel, (posPixel - cam.position + Vec3{0, 0, -10}).unitVector() 
 
-			vector<Sphere> sib = getSphereInBox(racine, r);
+			//Vec3 posPixel = Vec3{ 0,0,0 } +Vec3{ (float)(i - sizeX / 2), (float)(j - sizeY / 2), 0 };
+			//Ray r{ posPixel, (posPixel - Vec3{ 0,0,0 } + Vec3{0, 0, -5}).unitVector() };
+
+			
+			std:optional<Vec3> pixelColor = getColorFromRay(r, racine, l, 10);
+			if (pixelColor.has_value()) {
+				Vec3b col;
+				col[2] = clampColor(pixelColor.value().x, 400);
+				col[1] = clampColor(pixelColor.value().y, 400);
+				col[0] = clampColor(pixelColor.value().z, 400);
+				image.at<Vec3b>(j, i) = col;
+			}
+			else 
+				image.at<Vec3b>(j, i) = background;
+				
+			
+			//
 			//cout << sib.size() << endl;
+			
+			
+			//
+			//vector<Sphere> sib = s;
+			/*
+			vector<Sphere> sib = getSphereInBox(racine, r);
 			if (sib.size() > 0) {
 				float inter = 9999999;
 				bool intersect = false;
 				int ks = 0;
 
 				for (int k = 0; k < sib.size(); k++) {
-					//optional<float> interK = s[box.spheres[k]].intersect(r);
 					optional<float> interK = sib[k].intersect(r);
 
 					if (interK.has_value() && interK.value() < inter) {
@@ -491,24 +532,111 @@ int main()
 
 				if (intersect)
 				{
-					Vec3 point = r.origin + inter * r.direction;
-					Vec3 lum{ 0, 0, 0 };
-					for (int a = 0; a < l.size(); a++)
+					if (sib[ks].miroir) 
 					{
-						//Vec3 lu = l[a].getLightOut(point, r.origin, s[ks].centre, s[ks].color);
-						Vec3 lu = l[a].getLightOut(point, r.origin, sib[ks].centre, sib[ks].color);
-						lum = lum + lu * estOcculte(l[a], point, s, 0.0006f);
-						//lum = lum + lu * estOcculte(l[a], point, racine, 0.0006f);
-					}
+						Vec3 point = r.origin + inter * r.direction;
+						Vec3 D = r.direction.norm();
+						Vec3 N = (point - sib[ks].centre).norm();
+						Vec3 R = D - (2 * (N.dot(D)) * N);
+						Ray newR{ point, R};
+						vector<Sphere> sib2 = getSphereInBox(racine, newR);
+					
+						if (sib2.size() > 0) {
+							float inter2 = 9999999;
+							bool intersect2 = false;
+							int ks2 = 0;
 
-					Vec3b col;
-					col[2] = clampColor(lum.x, 400);
-					col[1] = clampColor(lum.y, 400);
-					col[0] = clampColor(lum.z, 400);
-					image.at<Vec3b>(j, i) = col;
+							for (int k2 = 0; k2 < sib2.size(); k2++) {
+								//if (sib2[k2].color.x == sib[ks].color.x && sib2[k2].color.y == sib[ks].color.y && sib2[k2].color.z == sib[ks].color.z)
+								//	continue;
+								optional<float> interK2 = sib2[k2].intersect(newR);
+
+								if (interK2.has_value() && interK2.value() < inter2) {
+									inter2 = interK2.value();
+									ks2 = k2;
+									intersect2 = true;
+								}
+							}
+
+							if (intersect2)
+							{
+								Vec3 point2 = newR.origin + inter2 * newR.direction;
+								Vec3 lum{ 0, 0, 0 };
+								for (int a = 0; a < l.size(); a++)
+								{
+									//cout << sib[ks2].color.x << " " << sib[ks2].color.y << " " << sib[ks2].color.z << endl;
+									Vec3 lu = l[a].getLightOut(point2, newR.origin, sib[ks2].centre, sib[ks2].color);
+									lum = lum + lu * estOcculte(l[a], point2, s, 0.0006f);
+									Vec3 lu2 = l[a].getLightOut(point, r.origin, sib[ks].centre, sib[ks].color);
+									lum = lum + lu2 * estOcculte(l[a], point, s, 0.0006f);
+								}
+
+								Vec3b col;
+								col[2] = clampColor(lum.x, 400);
+								col[1] = clampColor(lum.y, 400);
+								col[0] = clampColor(lum.z, 400);
+								image.at<Vec3b>(j, i) = col;
+							}
+							else {
+								Vec3 point = r.origin + inter * r.direction;
+								Vec3 lum{ 0, 0, 0 };
+								for (int a = 0; a < l.size(); a++)
+								{
+									Vec3 lu = l[a].getLightOut(point, r.origin, sib[ks].centre, sib[ks].color);
+									lum = lum + lu * estOcculte(l[a], point, s, 0.0006f);
+								}
+							
+								Vec3b col;
+								col[2] = clampColor(lum.x, 400);
+								col[1] = clampColor(lum.y, 400);
+								col[0] = clampColor(lum.z, 400);
+								col[2] = 0;
+								col[1] = 0;
+								col[0] = 0;
+								image.at<Vec3b>(j, i) = col;
+							}
+						}
+						else {
+							cout << "hey" << endl;
+							Vec3 point = r.origin + inter * r.direction;
+							Vec3 lum{ 0, 0, 0 };
+							for (int a = 0; a < l.size(); a++)
+							{
+								Vec3 lu = l[a].getLightOut(point, r.origin, sib[ks].centre, sib[ks].color);
+								lum = lum + lu * estOcculte(l[a], point, s, 0.0006f);
+							}
+
+							Vec3b col;
+							col[2] = clampColor(lum.x, 400);
+							col[1] = clampColor(lum.y, 400);
+							col[0] = clampColor(lum.z, 400);
+							image.at<Vec3b>(j, i) = col;
+						}
+					
+					}
+					else 
+					{
+						Vec3 point = r.origin + inter * r.direction;
+						Vec3 lum{ 0, 0, 0 };
+						for (int a = 0; a < l.size(); a++)
+						{
+							Vec3 lu = l[a].getLightOut(point, r.origin, sib[ks].centre, sib[ks].color);
+							//lum = lum + lu * estOcculte(l[a], point, s, 0.0006f);
+							lum = lum + lu * estOcculte(l[a], point, racine, 0.0006f);
+						}
+
+						Vec3b col;
+						col[2] = clampColor(lum.x, 400);
+						col[1] = clampColor(lum.y, 400);
+						col[0] = clampColor(lum.z, 400);
+						image.at<Vec3b>(j, i) = col;
+					}
+					
 				}
 			}
-				
+			*/
+			
+			
 		}
 
 	clock.tock();

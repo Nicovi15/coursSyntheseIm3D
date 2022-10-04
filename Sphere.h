@@ -1,8 +1,10 @@
 #pragma once
 #ifndef _SPHERE_
 #define _SPHERE_
+#include <string>
 #include "Ray.h"
 #include <optional>
+
 
 
 class Sphere
@@ -11,6 +13,7 @@ public :
 	Vec3 centre;
 	float radius;
 	Vec3 color;
+	std::string tag;
 
 	//essayer de remplacer par optional<float>
 	//float intersect(Ray r)
